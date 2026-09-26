@@ -1,0 +1,19 @@
+# Dependências: são reinstaladas com "npm install"
+node_modules/
+
+# Dados pessoais (número, chave PIX, endereço): NUNCA subir
+.env
+
+# Sessão do WhatsApp: quem tiver esses arquivos consegue usar a sua conta
+auth_info*/
+baileys*/
+
+# Banco de dados da loja (pedidos e dados de clientes)
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+
+# Logs
+*.log
+npm-debug.log*
