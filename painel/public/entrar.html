@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Primos | painel dos sócios</title>
+  <link rel="stylesheet" href="/static/estilo.css?v=4">
+  <script src="/static/entrar.js?v=4" defer></script>
+  <script src="/static/abertura.js?v=4" defer></script>
+</head>
+<body class="pagina-entrar abrindo">
+  <div class="cena" aria-hidden="true">
+    <div class="nevoa nevoa-funda"></div>
+    <div class="nevoa nevoa-media"></div>
+    <div class="palco" id="palco"></div>
+    <div class="nevoa nevoa-frente"></div>
+  </div>
+
+  <main class="entrar">
+    <div class="marca" role="img" aria-label="Primos">
+      <img class="marca-figura" id="marca-figura" src="/static/marca/primos-figura.svg" alt="">
+      <span class="marca-nome"><img src="/static/marca/primos-nome.svg" alt=""></span>
+    </div>
+    <p class="legenda">painel dos sócios</p>
+
+    <div class="formulario">
+      <div class="formulario-interno">
+        <form id="form-entrar" class="form-entrar" novalidate>
+          <h1 class="so-leitor">Entrar no painel da Primos</h1>
+
+          <label for="login">Login</label>
+          <input id="login" name="login" type="text" autocomplete="username" autocapitalize="none"
+                 spellcheck="false" required maxlength="30">
+
+          <label for="senha">Senha</label>
+          <input id="senha" name="senha" type="password" autocomplete="current-password" required maxlength="128">
+
+          <p id="mensagem" class="mensagem-erro" role="alert" aria-live="assertive" hidden></p>
+
+          <button type="submit" class="botao botao-principal">Entrar</button>
+          <p class="dica">Esqueceu a senha? Peça pro Ravi trocar pelo computador da loja.</p>
+        </form>
+      </div>
+    </div>
+  </main>
+
+  <button type="button" class="pular" id="pular">Pular abertura</button>
+</body>
+</html>

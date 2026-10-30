@@ -5,6 +5,7 @@ const ENDERECO_ORIGEM = process.env.ENDERECO_ORIGEM ?? '';
 
 const RAIO_GRATIS_KM = 5;
 const VALOR_POR_KM_EXCEDENTE = 5.0;
+const DISTANCIA_MAXIMA_KM = 40;
 
 let coordenadasOrigemCache = null;
 
@@ -70,7 +71,6 @@ async function buscarNoMapa(enderecoTexto) {
   try {
     const dados = await requisicaoHttps(url);
     if (!dados || dados.length === 0) return null;
-
     return {
       latitude: parseFloat(dados[0].lat),
       longitude: parseFloat(dados[0].lon),
@@ -84,14 +84,11 @@ async function buscarNoMapa(enderecoTexto) {
 function distanciaEmKm(lat1, lon1, lat2, lon2) {
   const R = 6371;
   const toRad = (graus) => (graus * Math.PI) / 180;
-
   const dLat = toRad(lat2 - lat1);
   const dLon = toRad(lon2 - lon1);
-
   const a =
     Math.sin(dLat / 2) ** 2 +
     Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 }
@@ -100,6 +97,18 @@ async function obterCoordenadasOrigem() {
   if (coordenadasOrigemCache) return coordenadasOrigemCache;
   coordenadasOrigemCache = await geocodificarEndereco(ENDERECO_ORIGEM);
   return coordenadasOrigemCache;
+}
+
+function freteDaDistancia(distanciaKm) {
+  if (distanciaKm > DISTANCIA_MAXIMA_KM) {
+    return { sucesso: false, motivo: 'distancia_fora_do_normal', distanciaKm };
+  }
+  if (distanciaKm <= RAIO_GRATIS_KM) {
+    return { sucesso: true, distanciaKm, valorFrete: 0, gratis: true };
+  }
+  const kmExcedente = distanciaKm - RAIO_GRATIS_KM;
+  const valorFrete = Math.round(kmExcedente * VALOR_POR_KM_EXCEDENTE * 100) / 100;
+  return { sucesso: true, distanciaKm, valorFrete, gratis: false };
 }
 
 export async function calcularFrete(enderecoCliente) {
@@ -113,14 +122,16 @@ export async function calcularFrete(enderecoCliente) {
     return { sucesso: false, motivo: 'nao_localizou_endereco_cliente' };
   }
 
-  const distanciaKm = distanciaEmKm(origem.latitude, origem.longitude, destino.latitude, destino.longitude);
+  return freteDaDistancia(distanciaEmKm(origem.latitude, origem.longitude, destino.latitude, destino.longitude));
+}
 
-  if (distanciaKm <= RAIO_GRATIS_KM) {
-    return { sucesso: true, distanciaKm, valorFrete: 0, gratis: true };
+export async function calcularFretePorCoordenadas(latitude, longitude) {
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    return { sucesso: false, motivo: 'localizacao_invalida' };
   }
-
-  const kmExcedente = distanciaKm - RAIO_GRATIS_KM;
-  const valorFrete = Math.round(kmExcedente * VALOR_POR_KM_EXCEDENTE * 100) / 100;
-
-  return { sucesso: true, distanciaKm, valorFrete, gratis: false };
+  const origem = await obterCoordenadasOrigem();
+  if (!origem) {
+    return { sucesso: false, motivo: 'nao_localizou_origem' };
+  }
+  return freteDaDistancia(distanciaEmKm(origem.latitude, origem.longitude, latitude, longitude));
 }

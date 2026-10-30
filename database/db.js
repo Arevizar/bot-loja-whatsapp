@@ -6,8 +6,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const db = new Database(path.join(__dirname, 'loja.db'));
 
 db.pragma('journal_mode = WAL');
+db.pragma('busy_timeout = 5000');
 
-// Guarda em que ponto da conversa cada cliente está + o carrinho atual dele
+export function transacao(fn) {
+  return db.transaction(fn).immediate;
+}
+
 db.exec(`
 CREATE TABLE IF NOT EXISTS clientes_estado (
   numero TEXT PRIMARY KEY,
@@ -21,9 +25,6 @@ CREATE TABLE IF NOT EXISTS clientes_estado (
 );
 `);
 
-// Pedidos. As colunas *_enviado / *_notificado marcam se a mensagem
-// correspondente REALMENTE saiu. A recuperação automática (que roda sempre
-// que o bot conecta) usa esses marcadores pra reenviar o que ficou pela metade.
 db.exec(`
 CREATE TABLE IF NOT EXISTS pedidos (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -42,8 +43,6 @@ CREATE TABLE IF NOT EXISTS pedidos (
 );
 `);
 
-// Atualiza bancos antigos sozinho: se faltar alguma coluna nova, adiciona.
-// Assim você não precisa apagar o loja.db quando o código ganhar colunas novas.
 function garantirColuna(tabela, coluna, definicao) {
   const colunas = db.prepare(`PRAGMA table_info(${tabela})`).all().map(c => c.name);
   if (!colunas.includes(coluna)) {
@@ -53,19 +52,22 @@ function garantirColuna(tabela, coluna, definicao) {
 garantirColuna('clientes_estado', 'frete', 'REAL DEFAULT 0');
 garantirColuna('clientes_estado', 'frete_confirmado', 'INTEGER DEFAULT 1');
 garantirColuna('clientes_estado', 'tentativas_endereco', 'INTEGER DEFAULT 0');
+garantirColuna('clientes_estado', 'pendencia', 'TEXT');
+garantirColuna('clientes_estado', 'latitude', 'REAL');
+garantirColuna('clientes_estado', 'longitude', 'REAL');
 garantirColuna('pedidos', 'frete', 'REAL DEFAULT 0');
 garantirColuna('pedidos', 'frete_confirmado', 'INTEGER DEFAULT 1');
 garantirColuna('pedidos', 'pix_enviado', 'INTEGER DEFAULT 0');
 garantirColuna('pedidos', 'dono_notificado', 'INTEGER DEFAULT 0');
 garantirColuna('pedidos', 'pagamento_notificado', 'INTEGER DEFAULT 0');
 garantirColuna('pedidos', 'resultado_notificado', 'INTEGER DEFAULT 0');
-
-// --- Funções de acesso ao estado do cliente ---
+garantirColuna('pedidos', 'resolvido_por', 'TEXT');
+garantirColuna('pedidos', 'resolvido_em', 'TEXT');
 
 export function getEstado(numero) {
   const row = db.prepare('SELECT * FROM clientes_estado WHERE numero = ?').get(numero);
   if (!row) return null;
-  return { ...row, carrinho: JSON.parse(row.carrinho) };
+  return { ...row, carrinho: JSON.parse(row.carrinho), pendencia: row.pendencia ? JSON.parse(row.pendencia) : null };
 }
 
 export function criarEstado(numero) {
@@ -77,11 +79,12 @@ export function criarEstado(numero) {
 
 export function atualizarEstado(numero, campos) {
   const atual = getEstado(numero);
-  if (!atual) return; // cliente sem conversa ativa: nada pra atualizar
+  if (!atual) return;
   const novo = { ...atual, ...campos };
   db.prepare(`
     UPDATE clientes_estado
-    SET etapa = ?, carrinho = ?, endereco = ?, frete = ?, frete_confirmado = ?, tentativas_endereco = ?, atualizado_em = datetime('now')
+    SET etapa = ?, carrinho = ?, endereco = ?, frete = ?, frete_confirmado = ?, tentativas_endereco = ?, pendencia = ?,
+        latitude = ?, longitude = ?, atualizado_em = datetime('now')
     WHERE numero = ?
   `).run(
     novo.etapa,
@@ -90,6 +93,9 @@ export function atualizarEstado(numero, campos) {
     novo.frete ?? 0,
     novo.frete_confirmado ?? 1,
     novo.tentativas_endereco ?? 0,
+    novo.pendencia ? JSON.stringify(novo.pendencia) : null,
+    novo.latitude ?? null,
+    novo.longitude ?? null,
     numero
   );
 }
@@ -98,13 +104,10 @@ export function resetarEstado(numero) {
   db.prepare('DELETE FROM clientes_estado WHERE numero = ?').run(numero);
 }
 
-// Usado pelos testes pra simular um cliente que sumiu por dias
 export function envelhecerEstado(numero, horas) {
   db.prepare(`UPDATE clientes_estado SET atualizado_em = datetime('now', ?) WHERE numero = ?`)
     .run(`-${horas} hours`, numero);
 }
-
-// --- Funções de pedidos ---
 
 export function salvarPedido({ numero_cliente, nome_cliente, itens, endereco, frete = 0, frete_confirmado = 1, status = 'aguardando_pagamento' }) {
   const resultado = db.prepare(`
@@ -141,7 +144,6 @@ export function definirFretePedido(id, frete) {
   db.prepare('UPDATE pedidos SET frete = ?, frete_confirmado = 1 WHERE id = ?').run(frete, id);
 }
 
-// Marcadores de "mensagem entregue de verdade"
 const COLUNAS_MARCADOR = ['pix_enviado', 'dono_notificado', 'pagamento_notificado', 'resultado_notificado'];
 
 export function marcarPedido(id, coluna, valor = 1) {
@@ -149,7 +151,10 @@ export function marcarPedido(id, coluna, valor = 1) {
   db.prepare(`UPDATE pedidos SET ${coluna} = ? WHERE id = ?`).run(valor, id);
 }
 
-// Último pedido do cliente: usado pra saber a qual pedido o "paguei" se refere
+export function registrarResolucao(id, quem) {
+  db.prepare(`UPDATE pedidos SET resolvido_por = ?, resolvido_em = datetime('now') WHERE id = ?`).run(quem || null, id);
+}
+
 export function ultimoPedidoDoCliente(numero) {
   const row = db.prepare(`
     SELECT * FROM pedidos

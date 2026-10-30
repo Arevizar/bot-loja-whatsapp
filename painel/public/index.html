@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Primos | painel</title>
+  <link rel="stylesheet" href="/static/estilo.css?v=4">
+  <script src="/static/app.js?v=4" type="module"></script>
+</head>
+<body>
+  <a class="pular-conteudo" href="#conteudo">Pular para o conteúdo</a>
+  <header class="topo">
+    <div class="topo-linha">
+      <a class="marca-topo" href="#inicio"><img src="/static/marca/primos.svg" alt="Primos"><span>painel</span></a>
+      <div class="conta">
+        <span id="nome-usuario" class="conta-nome"></span>
+        <button id="botao-sair" type="button" class="botao botao-discreto">Sair</button>
+      </div>
+    </div>
+    <nav class="abas" aria-label="Seções do painel">
+      <a href="#inicio" data-aba="inicio">Visão geral</a>
+      <a href="#estoque" data-aba="estoque">Estoque</a>
+      <a href="#movimentar" data-aba="movimentar">Dar baixa</a>
+      <a href="#historico" data-aba="historico">Entradas e saídas</a>
+      <a href="#vendas" data-aba="vendas">Vendas</a>
+    </nav>
+  </header>
+
+  <main id="conteudo" class="conteudo" tabindex="-1">
+    <p class="carregando">Carregando…</p>
+  </main>
+
+  <div id="aviso" class="aviso-flutuante" role="status" aria-live="polite" hidden></div>
+</body>
+</html>

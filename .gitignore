@@ -17,3 +17,11 @@ baileys*/
 # Logs
 *.log
 npm-debug.log*
+
+# Comprovantes de pagamento enviados pelos clientes
+comprovantes/
+
+# Testes manuais e versão antiga do visual
+_backup-visual-antigo/
+teste*.js
+testarFrete.js
